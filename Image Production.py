@@ -1,4 +1,4 @@
-# Made By Lakshya and Pranath On 14/4/19
+# Made By Lakshya
 
 import time
 import xlrd
@@ -6,6 +6,7 @@ from PIL import Image
 import numpy
 from random import shuffle
 from itertools import combinations
+from multiprocessing import Process
 
 # Global
 path = "C:\\Users\\Lakshya Sharma\\Desktop\\Projects\\Student-to-Abstract-Image\\"
@@ -40,6 +41,7 @@ def Read():
     sheet = workbook.sheet_by_index(0)
     global rowsheet
     global colsheet
+    global stud
     rowsheet = sheet.nrows - 1
     colsheet = sheet.ncols
 
@@ -52,6 +54,19 @@ def Read():
             temp.append(str(cell))
         data.append(temp)
     print("Data has been read from the Excel Sheet\n")
+
+    print("Reading Input Image\n")
+    im = Image.open(path + "IP.png")
+    for x in range(rowpixels):
+        for y in range(colpixels):
+            pixels[x][y] = im.getpixel((x,y))
+    print("Read Input Image\n")
+
+    print("Reading Key\n")
+    f = open("Key.txt","r")
+    stud = eval(f.read())
+    f.close()
+    print("Done Reading Key\n")
 
 
 def ImageGeneration():
@@ -233,38 +248,64 @@ def Encode():
                 temp += [combination[a]]*2
         shuffle(temp)
         stud.append(temp)
+
+    f = open("Key.txt","w")
+    f.write(str(stud))
+    f.close()
+
     print("Student Data has been Encoded\n")
 
+def SerialColour():
 
-def Colour():
-    """Colours the picture according to the student"""
-
-    print("Images are being created for each student\n")
     for i in range(rowsheet):
         im = Image.open(path + "IP.png")
         for x in range(rowpixels):
             for y in range(colpixels):
                 if visited[y][x] != -1:
-                    im.putpixel((x, y), stud[i][(visited[y, x]) % len(stud[i])])
+                    im.putpixel((y, x), stud[i][(visited[y, x]) % len(stud[i])])
         im.save(path + "/Output/OP" + str(i + 1) + ".png")
         print("Image has been created for student",i+1,"\n")
     print("All the Images have been saved\n")
 
+def Colour(i,visited,stud):
+    """Colours the picture according to the student"""
+    im = Image.open(path + "IP.png")
+    for x in range(rowpixels):
+        for y in range(colpixels):
+            if visited[y][x] != -1:
+                im.putpixel((y, x), stud[i][(visited[y, x]) % len(stud[i])])
+    im.save(path + "/Output/OP" + str(i + 1) + ".png")
+    print("Image has been created for student",i+1,"\n")
+    print("All the Images have been saved\n")
+
 
 # Main
+if __name__ == "__main__":
 
-Read()
+    Read()
 
-ImageGeneration()
+    # ImageGeneration()
 
-Object_Identification()
+    Object_Identification()
 
-Encode()
+    # Encode()
 
-start = time.time()
+    start = time.time()
 
-Colour()
+    # SerialColour()
 
-end = time.time()
+    #Parallel Start
+    processes = [None] * rowsheet
+    for i in range(rowsheet):
+        processes[i] = Process(target=Colour, args=((i,visited,stud,)))
 
-print("Total Time Taken For Coloring : ", int(end - start), "seconds\n")
+    for i in range(len(processes)):
+        processes[i].start()
+
+    for i in range(len(processes)):
+        processes[i].join()
+    #Parallel End
+
+    end = time.time()
+
+    print("Total Time Taken For Coloring : ", int(end - start), "seconds\n")
