@@ -8,7 +8,7 @@ from random import shuffle
 from itertools import combinations
 
 # Global
-path = "C:\\Users\\Lakshya Sharma\\Desktop\\Projects\\MathProjectData\\version 2\\"
+path = "C:\\Users\\Lakshya Sharma\\Desktop\\Projects\\Student-to-Abstract-Image\\"
 data = []                                               # Stores Student Details from excel sheet as a 2D Array of strings
 shape_pixels = []                                       # Stores (R,G,B,A) Pixel Value in a 2D Array
 stud = []                                               # Stores Encoded colour values for each Student in a 2D Array
@@ -246,14 +246,12 @@ def Colour():
             for y in range(colpixels):
                 if visited[y][x] != -1:
                     im.putpixel((x, y), stud[i][(visited[y, x]) % len(stud[i])])
-        im.save(path + "OP" + str(i + 1) + ".png")
+        im.save(path + "/Output/OP" + str(i + 1) + ".png")
         print("Image has been created for student",i+1,"\n")
     print("All the Images have been saved\n")
 
 
 # Main
-
-start = time.time()
 
 Read()
 
@@ -263,8 +261,10 @@ Object_Identification()
 
 Encode()
 
+start = time.time()
+
 Colour()
 
 end = time.time()
 
-print("Total Time Taken : ", int(end - start), "seconds\n")
+print("Total Time Taken For Coloring : ", int(end - start), "seconds\n")
