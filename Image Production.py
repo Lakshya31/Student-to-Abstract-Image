@@ -288,7 +288,7 @@ if __name__ == "__main__":
 
     Object_Identification()
 
-    # Encode()
+    Encode()
 
     start = time.time()
 
