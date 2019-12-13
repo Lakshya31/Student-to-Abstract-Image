@@ -6,23 +6,40 @@ from PIL import Image
 import numpy
 from random import shuffle
 from itertools import combinations
+import copy
+from numba import cuda
 from multiprocessing import Process
+cuda.select_device(0)
 
 # Global
 path = "C:\\Users\\Lakshya Sharma\\Desktop\\Projects\\Student-to-Abstract-Image\\"
-data = []                                               # Stores Student Details from excel sheet as a 2D Array of strings
-shape_pixels = []                                       # Stores (R,G,B,A) Pixel Value in a 2D Array
-stud = []                                               # Stores Encoded colour values for each Student in a 2D Array
-boundary = 50                                           # Boundary Margin in Pixels
-rowpixels = 2100                                        # Number of pixels in one column
-colpixels = 2100                                        # Number of pixels in one row
-pixels = numpy.array([[None] * colpixels] * rowpixels)  # Stores (R,G,B,A) Pixel Value in a 2D Array
+# Stores Student Details from excel sheet as a 2D Array of strings
+data = []
+# Stores (R,G,B,A) Pixel Value in a 2D Array
+shape_pixels = []
+# Stores Encoded colour values for each Student in a 2D Array
+stud = []
+# Boundary Margin in Pixels
+boundary = 50
+# Number of pixels in one column
+rowpixels = 1000
+# Number of pixels in one row
+colpixels = 1000
+# Stores (R,G,B,A) Pixel Value in a 2D Array
+pixels = numpy.array([numpy.array([None] * colpixels)] * rowpixels)
+# Stores (R,G,B,A) Pixel Value in a 2D Array
+np_pixels = numpy.array([numpy.array([None] * colpixels)] * rowpixels)
 rowsheet = 0                                            # Number of Student Tuples
-colsheet = 0                                            # Number of Student Attributes
-objects = 0                                             # Number of identified colourable objects in the image
-visited = numpy.array([])                               # Stores identified objects of an image as a 2D array
-key = [i for i in range(256)]                           # Stores Possible colour values (0 to 255)
-shuffle(key)                                            # This shuffles the array with value range 0-255
+# Number of Student Attributes
+colsheet = 0
+# Number of identified colourable objects in the image
+objects = 0
+# Stores identified objects of an image as a 2D array
+visited = numpy.array([])
+# Stores Possible colour values (0 to 255)
+key = [i for i in range(256)]
+# This shuffles the array with value range 0-255
+shuffle(key)
 # Possible characters in the data:
 character_array = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
                    'u', 'v', 'w', 'x', 'y', 'z', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'A', 'S', 'D', 'F',
@@ -59,11 +76,12 @@ def Read():
     im = Image.open(path + "IP.png")
     for x in range(rowpixels):
         for y in range(colpixels):
-            pixels[x][y] = im.getpixel((x,y))
+            pixels[x][y] = im.getpixel((x, y))
+            np_pixels[x][y] = numpy.array(im.getpixel((x, y)))
     print("Read Input Image\n")
 
     print("Reading Key\n")
-    f = open("Key.txt","r")
+    f = open("Key.txt", "r")
     stud = eval(f.read())
     f.close()
     print("Done Reading Key\n")
@@ -102,7 +120,8 @@ def ImageGeneration():
     # Putting Multiple Copies of Image in array
     for i in range(boundary, colpixels - boundary):
         for j in range(boundary, rowpixels - boundary):
-            pixels[i][j] = shape_pixels[(i - boundary) % cols][(j - boundary) % rows]
+            pixels[i][j] = shape_pixels[(i - boundary) %
+                                        cols][(j - boundary) % rows]
 
     # Saving array as Image
     im = Image.open(path + "IP.png")
@@ -249,11 +268,12 @@ def Encode():
         shuffle(temp)
         stud.append(temp)
 
-    f = open("Key.txt","w")
+    f = open("Key.txt", "w")
     f.write(str(stud))
     f.close()
 
     print("Student Data has been Encoded\n")
+
 
 def SerialColour():
 
@@ -262,50 +282,73 @@ def SerialColour():
         for x in range(rowpixels):
             for y in range(colpixels):
                 if visited[y][x] != -1:
-                    im.putpixel((y, x), stud[i][(visited[y, x]) % len(stud[i])])
+                    im.putpixel((y, x), stud[i]
+                                [(visited[y, x]) % len(stud[i])])
         im.save(path + "/Output/OP" + str(i + 1) + ".png")
-        print("Image has been created for student",i+1,"\n")
+        print("Image has been created for student", i+1, "\n")
     print("All the Images have been saved\n")
 
-def Colour(i,visited,stud):
+
+@cuda.jit
+def Colour():
     """Colours the picture according to the student"""
+
+    x = cuda.threadIdx.x
+    y = cuda.blockIdx.x
+    # pic[y][x] = stud[i][(visited[y, x]) % len(stud[i])]
+
+
+def ParallelColour():
+    """Calls Cuda Kernel Shiz"""
+    global visited
+    global stud
+    visited = numpy.array(visited)
+    stud = numpy.asarray(stud)
+    threadsperblock = 1000
+    blockspergrid = 1000
+    pics = numpy.array([None])
+    # for i in range(rowsheet):
+    #     pics[i] = pixels.copy()
+    pics[0] = np_pixels.copy()
+    print(type(stud[0][1]))
+    # Colour[blockspergrid, threadsperblock](pics[0],numpy.array(visited),numpy.array(stud))
+    # for i in range(rowsheet):
+    #     Colour[blockspergrid, threadsperblock](pics[i],numpy.array(visited),numpy.array(stud))
+    # for i in range(rowsheet):
+    #     img = Image.fromarray(pics[i])
+    #     img.save(path + "/Output/OP" + str(i + 1) + ".png")
+
+
+def ProcessColour(i, visited, stud):
     im = Image.open(path + "IP.png")
     for x in range(rowpixels):
         for y in range(colpixels):
             if visited[y][x] != -1:
                 im.putpixel((y, x), stud[i][(visited[y, x]) % len(stud[i])])
     im.save(path + "/Output/OP" + str(i + 1) + ".png")
-    print("Image has been created for student",i+1,"\n")
-    print("All the Images have been saved\n")
+    print("Image has been created for student", i+1, "\n")
 
 
 # Main
 if __name__ == "__main__":
 
     Read()
-
     # ImageGeneration()
-
     Object_Identification()
-
     Encode()
-
     start = time.time()
+    # ParallelColour()
+    SerialColour()
+    # Parallel Start
+    # processes = [None] * rowsheet
+    # for i in range(rowsheet):
+    #     processes[i] = Process(target=ProcessColour, args=((i,visited,stud,)))
 
-    # SerialColour()
+    # for i in range(len(processes)):
+    #     processes[i].start()
 
-    #Parallel Start
-    processes = [None] * rowsheet
-    for i in range(rowsheet):
-        processes[i] = Process(target=Colour, args=((i,visited,stud,)))
-
-    for i in range(len(processes)):
-        processes[i].start()
-
-    for i in range(len(processes)):
-        processes[i].join()
-    #Parallel End
-
+    # for i in range(len(processes)):
+    #     processes[i].join()
+    # Parallel End
     end = time.time()
-
     print("Total Time Taken For Coloring : ", int(end - start), "seconds\n")
